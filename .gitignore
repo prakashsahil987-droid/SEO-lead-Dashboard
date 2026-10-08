@@ -1,0 +1,7 @@
+node_modules
+.next
+.env
+.env.*
+!.env.example
+# Keep local lead/contacted data out of version control.
+data/
