@@ -1,0 +1,27 @@
+import { NextResponse } from 'next/server';
+import { crawlDomain } from '@/lib/audit/crawler';
+import { evaluateAudit } from '@/lib/audit/evaluator';
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { leadId, url } = body;
+
+    if (!url || !leadId) {
+      return NextResponse.json(
+        { error: 'Missing required fields: leadId and url' },
+        { status: 400 }
+      );
+    }
+
+    const rawData = await crawlDomain(url);
+    const auditResult = evaluateAudit(leadId, rawData);
+
+    return NextResponse.json(auditResult);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to complete website audit', details: String(error) },
+      { status: 500 }
+    );
+  }
+}
