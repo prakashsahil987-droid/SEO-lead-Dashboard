@@ -1,0 +1,27 @@
+import { z } from 'zod';
+
+export const AuditIssueSchema = z.object({
+  code: z.string(),
+  severity: z.enum(['CRITICAL', 'WARNING', 'INFO']),
+  message: z.string(),
+});
+
+export const AuditResultSchema = z.object({
+  leadId: z.string(),
+  scannedAt: z.string(),
+  url: z.string(),
+  passed: z.boolean(),
+  issues: z.array(AuditIssueSchema),
+  metrics: z.object({
+    responseTimeMs: z.number(),
+    hasTitle: z.boolean(),
+    hasMetaDescription: z.boolean(),
+    h1Status: z.enum(['MISSING', 'OPTIMAL', 'MULTIPLE']),
+    missingAltPercentage: z.number(),
+    isHttps: z.boolean(),
+    hasSitemap: z.boolean(),
+  }),
+});
+
+export type AuditIssue = z.infer<typeof AuditIssueSchema>;
+export type AuditResult = z.infer<typeof AuditResultSchema>;

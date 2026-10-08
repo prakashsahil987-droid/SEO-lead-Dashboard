@@ -1,0 +1,80 @@
+import { RawAuditData } from './crawler';
+import { AuditIssue, AuditResult } from './schema';
+
+export function evaluateAudit(leadId: string, raw: RawAuditData): AuditResult {
+  const issues: AuditIssue[] = [];
+
+  if (!raw.isHttps) {
+    issues.push({
+      code: 'NO_HTTPS',
+      severity: 'CRITICAL',
+      message: 'Website does not force secure HTTPS connections.',
+    });
+  }
+
+  if (!raw.title) {
+    issues.push({
+      code: 'MISSING_TITLE',
+      severity: 'CRITICAL',
+      message: 'Missing standard HTML <title> element.',
+    });
+  }
+
+  if (!raw.metaDescription) {
+    issues.push({
+      code: 'MISSING_META_DESC',
+      severity: 'WARNING',
+      message: 'Missing primary meta description tag.',
+    });
+  }
+
+  if (raw.h1Count === 0) {
+    issues.push({
+      code: 'MISSING_H1',
+      severity: 'WARNING',
+      message: 'Homepage contains no <h1> header tags.',
+    });
+  } else if (raw.h1Count > 1) {
+    issues.push({
+      code: 'MULTIPLE_H1',
+      severity: 'INFO',
+      message: `Multiple <h1> tags detected (${raw.h1Count} found).`,
+    });
+  }
+
+  const missingAltPct = raw.imagesTotal > 0 ? (raw.imagesMissingAlt / raw.imagesTotal) * 100 : 0;
+  if (raw.imagesTotal > 0 && missingAltPct > 30) {
+    issues.push({
+      code: 'ALT_TAGS_MISSING',
+      severity: 'WARNING',
+      message: `${Math.round(missingAltPct)}% of images are missing alt text.`,
+    });
+  }
+
+  if (!raw.hasSitemap) {
+    issues.push({
+      code: 'NO_SITEMAP',
+      severity: 'INFO',
+      message: 'No active sitemap.xml file was detected on root domain.',
+    });
+  }
+
+  const hasCritical = issues.some((i) => i.severity === 'CRITICAL');
+
+  return {
+    leadId,
+    scannedAt: new Date().toISOString(),
+    url: raw.finalUrl,
+    passed: !hasCritical,
+    issues,
+    metrics: {
+      responseTimeMs: raw.responseTimeMs,
+      hasTitle: Boolean(raw.title),
+      hasMetaDescription: Boolean(raw.metaDescription),
+      h1Status: raw.h1Count === 0 ? 'MISSING' : raw.h1Count === 1 ? 'OPTIMAL' : 'MULTIPLE',
+      missingAltPercentage: Math.round(missingAltPct),
+      isHttps: raw.isHttps,
+      hasSitemap: raw.hasSitemap,
+    },
+  };
+}

@@ -1,0 +1,74 @@
+import * as cheerio from 'cheerio';
+
+export interface RawAuditData {
+  statusCode: number;
+  finalUrl: string;
+  isHttps: boolean;
+  title?: string;
+  metaDescription?: string;
+  h1Count: number;
+  h1Texts: string[];
+  imagesTotal: number;
+  imagesMissingAlt: number;
+  hasCanonical: boolean;
+  canonicalUrl?: string;
+  hasOpenGraph: boolean;
+  hasSitemap: boolean;
+  responseTimeMs: number;
+}
+
+export async function crawlDomain(domainUrl: string): Promise<RawAuditData> {
+  const startTime = Date.now();
+  const formattedUrl = domainUrl.startsWith('http') ? domainUrl : `https://${domainUrl}`;
+
+  const response = await fetch(formattedUrl, {
+    method: 'GET',
+    headers: { 'User-Agent': 'SEOLeadIntelBot/1.0' },
+    redirect: 'follow',
+  });
+
+  const responseTimeMs = Date.now() - startTime;
+  const html = await response.text();
+  const $ = cheerio.load(html);
+
+  // Extract core HTML elements
+  const title = $('title').first().text().trim() || undefined;
+  const metaDescription = $('meta[name="description"]').attr('content')?.trim() || undefined;
+  const h1Elements = $('h1').map((_, el) =>$(el).text().trim()).get();
+  
+  const images = $('img');
+  let imagesMissingAlt = 0;
+  images.each((_, img) => {
+    if (!$(img).attr('alt')) imagesMissingAlt++;
+  });
+
+  const canonicalUrl = $('link[rel="canonical"]').attr('href') || undefined;
+  const hasOpenGraph = $('meta[property^="og:"]').length > 0;
+
+  // Check for sitemap.xml presence
+  let hasSitemap = false;
+  try {
+    const sitemapUrl = new URL('/sitemap.xml', response.url).toString();
+    const sitemapRes = await fetch(sitemapUrl, { method: 'HEAD' });
+    hasSitemap = sitemapRes.ok;
+  } catch {
+    hasSitemap = false;
+  }
+
+  return {
+    statusCode: response.status,
+    finalUrl: response.url,
+    isHttps: response.url.startsWith('https://'),
+    title,
+    metaDescription,
+    h1Count: h1Elements.length,
+    h1Texts: h1Elements,
+    imagesTotal: images.length,
+    imagesMissingAlt,
+    hasCanonical: Boolean(canonicalUrl),
+    canonicalUrl,
+    hasOpenGraph,
+    hasSitemap,
+    responseTimeMs,
+  };
+}
